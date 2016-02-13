@@ -1,0 +1,7 @@
+name = Migrate IMDB
+description = "Migrate JSON data from IMDB"
+core = 7.x
+package = RMDB
+files[] = include/movie_migrate.inc
+dependencies[] = migrate
+configure = 'admin/migrate/setsource'

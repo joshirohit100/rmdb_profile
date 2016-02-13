@@ -1,0 +1,6 @@
+name = RMDB Customize
+description = "Provides some customization to RMDB."
+core = 7.x
+package = RMDB
+files[] = views/rmdb_customize.views_default.inc
+stylesheets[all][] = css/rmdb_customize.css

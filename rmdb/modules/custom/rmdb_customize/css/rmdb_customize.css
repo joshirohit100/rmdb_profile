@@ -1,0 +1,81 @@
+/*
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+*/
+/*
+    Created on : Jan 10, 2016, 9:44:32 PM
+    Author     : Rohit
+*/
+
+.node-type-movie .content .node-full .content .field-name-field-image {
+    float:left;
+    width: 45%;
+}
+
+.node-type-movie .content .node-full .content .field-name-field-director {
+    float: left;
+    width: 55%;
+    margin-bottom: 20px;
+}
+.node-type-movie .content .node-full .content .field-name-field-rating {
+    float: left;
+    width: 15%;
+    //margin-bottom: 10px;
+}
+.node-type-movie .content .node-full .content .field-name-field-year {
+    float: left;
+    width: 15%;
+}
+.node-type-movie .content .node-full .content .field-name-field-run-time {
+    float: left;
+    width: 25%;
+    margin-bottom: 20px;
+}
+.node-type-movie .content .node-full .content .field-name-field-votes {
+    float: left;
+    width: 15%;
+}
+.node-type-movie .content .node-full .content .field-name-field-metascore {
+    float: left;
+    width: 15%;
+    margin-bottom: 20px;
+}
+.node-type-movie .content .node-full .content .field-name-field-released {
+    float: left;
+    width: 25%;
+    margin-bottom: 20px;
+}
+.node-type-movie .content .node-full .content .field-name-field-writers {
+    float: left;
+    width: 30%;
+}
+.node-type-movie .content .node-full .content .field-name-field-actors {
+    float: left;
+    width: 25%;
+    margin-bottom: 20px;
+}
+.node-type-movie .content .node-full .content .field-name-field-awards {
+    font-size: 200%;
+    margin-bottom: 20px;
+    width: 55%;
+    float: left;
+    background-color: aliceblue;
+}
+.node-type-movie .content .node-full .content .field-name-field-country {
+    float: left;
+    width: 27%;
+}
+.node-type-movie .content .node-full .content .field-name-field-language {
+    float: left;
+    width: 27%;
+}
+.page-movie-list h1, .node-type-movie.page-node h1, .page-taxonomy-term h1, .page-node.node-type-actor-director-writter h1 {
+    font-size: 400% !important;
+}
+.page-movie-list .view-empty {
+    font-size: 300%;
+}
+h2 {
+    font-size: 200% !important;
+}

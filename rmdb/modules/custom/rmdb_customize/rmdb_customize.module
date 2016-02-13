@@ -1,0 +1,71 @@
+<?php
+
+/**
+ * @file
+ * Module file provides some customization to the RMDB.
+ */
+
+/**
+ * Implements hook_form_alter().
+ */
+function rmdb_customize_form_alter(&$form, &$form_state, $form_id) {
+  if ($form['#id'] === 'views-exposed-form-movie-list-page') {
+    unset($form['field_genre_tid']['#description']);
+    unset($form['field_language_tid']['#description']);
+    $form['field_year_value']['#type'] = 'select';
+    $form['field_year_value']['#options'] = array('' => ' - Any - ') + _rmdb_customize_year_array();
+    $form['field_year_value']['#default_value'] = '';
+    unset($form['field_year_value']['#size']);
+    $form['field_rating_value']['#type'] = 'select';
+    $form['field_rating_value']['#options'] = array(
+      '' => ' - Any - ',
+      '9.1-10' => '>9',
+      '7.5-9' => '7.5-9',
+      '5.1-7.5' => '5-7.5',
+      '0-5' => '<5',
+    );
+    $form['field_rating_value']['#default_value'] = '';
+    unset($form['field_rating_value']['#size']);
+  }
+}
+
+/**
+ * Provides years as array list.
+ */
+function _rmdb_customize_year_array($start_year = 1900, $end_year = 2021) {
+  $years = array();
+  for ($i = $start_year; $i < $end_year; $i++) {
+    $years[$i] = $i;
+  }
+  return $years;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function rmdb_customize_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'rmdb_customize') . '/views',
+  );
+}
+
+/**
+ * Implements hook_views_query_alter().
+ */
+function rmdb_customize_views_query_alter(&$view, &$query) {
+  if ($view->name === 'movie_list' && $view->current_display === 'page') {
+    foreach ($query->where as &$condition_group) {
+      foreach ($condition_group['conditions'] as &$condition) {
+        if ($condition['field'] == 'field_data_field_rating.field_rating_value') {
+          $value = $condition['value'];
+          $condition = array(
+            'field' => 'field_data_field_rating.field_rating_value',
+            'value' => explode('-', $value),
+            'operator' => 'BETWEEN',
+          );
+        }
+      }
+    }
+  }
+}

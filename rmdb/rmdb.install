@@ -1,0 +1,823 @@
+<?php
+/**
+ * @file
+ * Install, update and uninstall functions for the rmdb installation profile.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function rmdb_install() {
+  // Add text formats.
+  $filtered_html_format = array(
+    'format' => 'filtered_html',
+    'name' => 'Filtered HTML',
+    'weight' => 0,
+    'filters' => array(
+      // URL filter.
+      'filter_url' => array(
+        'weight' => 0,
+        'status' => 1,
+      ),
+      // HTML filter.
+      'filter_html' => array(
+        'weight' => 1,
+        'status' => 1,
+      ),
+      // Line break filter.
+      'filter_autop' => array(
+        'weight' => 2,
+        'status' => 1,
+      ),
+      // HTML corrector filter.
+      'filter_htmlcorrector' => array(
+        'weight' => 10,
+        'status' => 1,
+      ),
+    ),
+  );
+  $filtered_html_format = (object) $filtered_html_format;
+  filter_format_save($filtered_html_format);
+
+  $full_html_format = array(
+    'format' => 'full_html',
+    'name' => 'Full HTML',
+    'weight' => 1,
+    'filters' => array(
+      // URL filter.
+      'filter_url' => array(
+        'weight' => 0,
+        'status' => 1,
+      ),
+      // Line break filter.
+      'filter_autop' => array(
+        'weight' => 1,
+        'status' => 1,
+      ),
+      // HTML corrector filter.
+      'filter_htmlcorrector' => array(
+        'weight' => 10,
+        'status' => 1,
+      ),
+    ),
+  );
+  $full_html_format = (object) $full_html_format;
+  filter_format_save($full_html_format);
+
+  // Enable some standard blocks.
+  $default_theme = variable_get('theme_default', 'bartik');
+  $admin_theme = 'seven';
+  $blocks = array(
+    array(
+      'module' => 'system',
+      'delta' => 'main',
+      'theme' => $default_theme,
+      'status' => 1,
+      'weight' => 0,
+      'region' => 'content',
+      'pages' => '',
+      'cache' => -1,
+    ),
+    array(
+      'module' => 'user',
+      'delta' => 'login',
+      'theme' => $default_theme,
+      'status' => 1,
+      'weight' => 0,
+      'region' => 'header',
+      'pages' => '',
+      'cache' => -1,
+    ),
+    array(
+      'module' => 'system',
+      'delta' => 'powered-by',
+      'theme' => $default_theme,
+      'status' => 1,
+      'weight' => 10,
+      'region' => 'footer',
+      'pages' => '',
+      'cache' => -1,
+    ),
+    array(
+      'module' => 'system',
+      'delta' => 'main',
+      'theme' => $admin_theme,
+      'status' => 1,
+      'weight' => 0,
+      'region' => 'content',
+      'pages' => '',
+      'cache' => -1,
+    ),
+    array(
+      'module' => 'user',
+      'delta' => 'login',
+      'theme' => $admin_theme,
+      'status' => 1,
+      'weight' => 10,
+      'region' => 'header',
+      'pages' => '',
+      'cache' => -1,
+    ),
+  );
+  $query = db_insert('block')->fields(array('module', 'delta', 'theme', 'status', 'weight', 'region', 'pages', 'cache'));
+  foreach ($blocks as $block) {
+    $query->values($block);
+  }
+  $query->execute();
+
+  $types = array(
+    array(
+      'type' => 'actor_director_writter',
+      'name' => st('Actor / Director / Writer'),
+      'base' => 'node_content',
+      'custom' => 1,
+      'modified' => 1,
+      'locked' => 0,
+      'title_label' => 'Name',
+    ),
+    array(
+      'type' => 'movie',
+      'name' => st('Movie'),
+      'base' => 'node_content',
+      'custom' => 1,
+      'modified' => 1,
+      'locked' => 0,
+    ),
+  );
+
+  foreach ($types as $type) {
+    $temp_type = $type;
+    $type = node_type_set_defaults($type);
+    node_type_save($type);
+    $body_label = $temp_type['type'] == 'movie' ? 'Plot' : 'Bio';
+    node_add_body_field($type, $body_label);
+  }
+
+  // Default movie and actor_director_writer to not be promoted and have comments disabled.
+  variable_set('node_options_movie', array('status'));
+  variable_set('comment_movie', COMMENT_NODE_HIDDEN);
+  variable_set('node_options_actor_director_writter', array('status'));
+  variable_set('comment_actor_director_writter', COMMENT_NODE_HIDDEN);
+
+  // Don't display date and author information for content types by default.
+  variable_set('node_submitted_movie', FALSE);
+  variable_set('node_submitted_actor_director_writter', FALSE);
+
+  //Field Year
+  $field = array(
+    'field_name' => 'field_year',
+    'type' => 'number_integer',
+    'cardinality' => 1,
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_year',
+    'entity_type' => 'node',
+    'label' => 'Year',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'numer',
+      'weight' => 3,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'number_integer',
+        'label' => 'inline',
+        'weight' => 4,
+      ),
+      'teaser' => array(
+        'type' => 'number_integer',
+        'label' => 'inline',
+        'weight' => 2,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  $vocabulary = (object) array(
+    'name' => st('Country'),
+    'machine_name' => 'country',
+  );
+  taxonomy_vocabulary_save($vocabulary);
+  $field = array(
+    'field_name' => 'field_' . $vocabulary->machine_name,
+    'type' => 'taxonomy_term_reference',
+    // Set cardinality to unlimited for tagging.
+    'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+    'settings' => array(
+      'allowed_values' => array(
+        array(
+          'vocabulary' => $vocabulary->machine_name,
+          'parent' => 0,
+        ),
+      ),
+    ),
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_' . $vocabulary->machine_name,
+    'entity_type' => 'node',
+    'label' => 'Country',
+    'bundle' => 'movie',
+    'description' => $help,
+    'widget' => array(
+      'type' => 'options_select',
+      'weight' => 4,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'taxonomy_term_reference_link',
+        'label' => 'inline',
+        'weight' => 12,
+      ),
+      'teaser' => array(
+        'type' => 'taxonomy_term_reference_link',
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  $vocabulary = (object) array(
+    'name' => st('Genre'),
+    'machine_name' => 'genre',
+  );
+  taxonomy_vocabulary_save($vocabulary);
+  $field = array(
+    'field_name' => 'field_' . $vocabulary->machine_name,
+    'type' => 'taxonomy_term_reference',
+    // Set cardinality to unlimited for tagging.
+    'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+    'settings' => array(
+      'allowed_values' => array(
+        array(
+          'vocabulary' => $vocabulary->machine_name,
+          'parent' => 0,
+        ),
+      ),
+    ),
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_' . $vocabulary->machine_name,
+    'entity_type' => 'node',
+    'label' => 'Genre',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'taxonomy_autocomplete',
+      'weight' => 5,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'taxonomy_term_reference_link',
+        'label' => 'inline',
+        'weight' => 14,
+      ),
+      'teaser' => array(
+        'type' => 'taxonomy_term_reference_link',
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  $vocabulary = (object) array(
+    'name' => st('Language'),
+    'machine_name' => 'language',
+  );
+  taxonomy_vocabulary_save($vocabulary);
+
+  $field = array(
+    'field_name' => 'field_' . $vocabulary->machine_name,
+    'type' => 'taxonomy_term_reference',
+    // Set cardinality to unlimited for tagging.
+    'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+    'settings' => array(
+      'allowed_values' => array(
+        array(
+          'vocabulary' => $vocabulary->machine_name,
+          'parent' => 0,
+        ),
+      ),
+    ),
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_' . $vocabulary->machine_name,
+    'entity_type' => 'node',
+    'label' => 'Language',
+    'bundle' => 'movie',
+    'description' => $help,
+    'widget' => array(
+      'type' => 'options_select',
+      'weight' => 6,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'taxonomy_term_reference_link',
+        'weight' => 13,
+        'label' => 'inline',
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  // Field Poster.
+  $field = array(
+    'field_name' => 'field_image',
+    'type' => 'image',
+    'cardinality' => 1,
+    'locked' => FALSE,
+    'indexes' => array('fid' => array('fid')),
+    'settings' => array(
+      'uri_scheme' => 'public',
+      'default_image' => FALSE,
+    ),
+    'storage' => array(
+      'type' => 'field_sql_storage',
+      'settings' => array(),
+    ),
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_image',
+    'entity_type' => 'node',
+    'label' => 'Poster',
+    'bundle' => 'movie',
+    'required' => FALSE,
+
+    'settings' => array(
+      'file_directory' => 'field/image',
+      'file_extensions' => 'png gif jpg jpeg',
+      'max_filesize' => '',
+      'max_resolution' => '',
+      'min_resolution' => '',
+      'alt_field' => TRUE,
+      'title_field' => '',
+    ),
+
+    'widget' => array(
+      'type' => 'image_image',
+      'settings' => array(
+        'progress_indicator' => 'throbber',
+        'preview_image_style' => 'thumbnail',
+      ),
+      'weight' => 7,
+    ),
+
+    'display' => array(
+      'default' => array(
+        'label' => 'hidden',
+        'type' => 'image',
+        'settings' => array('image_style' => 'large', 'image_link' => ''),
+        'weight' => -1,
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'settings' => array('image_style' => 'medium', 'image_link' => 'content'),
+        'weight' => -1,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field runtime
+  $field = array(
+    'field_name' => 'field_run_time',
+    'type' => 'text',
+    'cardinality' => 1,
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_run_time',
+    'entity_type' => 'node',
+    'label' => 'Runtime',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'text_textfield',
+      'weight' => 8,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'text_default',
+        'label' => 'inline',
+        'weight' => 5,
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field awards
+  $field = array(
+    'field_name' => 'field_awards',
+    'type' => 'text',
+    'cardinality' => 1,
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_awards',
+    'entity_type' => 'node',
+    'label' => 'Awards',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'text_textfield',
+      'weight' => 9,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'text_default',
+        'label' => 'hidden',
+        'weight' => 11,
+      ),
+      'teaser' => array(
+        'type' => 'text_default',
+        'label' => 'inline',
+        'weight' => 6,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field director
+  $field = array(
+    'field_name' => 'field_director',
+    'type' => 'node_reference',
+    'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+    'settings' => array(
+        'referenceable_types' => array(
+            'actor_director_writter'
+        ),
+    )
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_director',
+    'entity_type' => 'node',
+    'label' => 'Director',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'options_select',
+      'weight' => 11,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'node_reference_default',
+        'label' => 'inline',
+        'weight' => 2,
+      ),
+      'teaser' => array(
+        'type' => 'node_reference_default',
+        'label' => 'inline',
+        'weight' => 5,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field actors
+  $field = array(
+    'field_name' => 'field_actors',
+    'type' => 'node_reference',
+    'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+    'settings' => array(
+        'referenceable_types' => array(
+            'actor_director_writter'
+        ),
+    )
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_actors',
+    'entity_type' => 'node',
+    'label' => 'Stars',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'options_select',
+      'weight' => 12,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'node_reference_default',
+        'label' => 'inline',
+        'weight' => 10,
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field writers
+  $field = array(
+    'field_name' => 'field_writers',
+    'type' => 'node_reference',
+    'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+    'settings' => array(
+        'referenceable_types' => array(
+            'actor_director_writter'
+        ),
+    )
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_writers',
+    'entity_type' => 'node',
+    'label' => 'Writers',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'options_select',
+      'weight' => 13,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'node_reference_default',
+        'label' => 'inline',
+        'weight' => 9,
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field votes
+  $field = array(
+    'field_name' => 'field_votes',
+    'type' => 'text',
+    'cardinality' => 1,
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_votes',
+    'entity_type' => 'node',
+    'label' => 'Votes',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'text_textfield',
+      'weight' => 14,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'text_default',
+        'label' => 'inline',
+        'weight' => 6,
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field metascors
+  $field = array(
+    'field_name' => 'field_metascore',
+    'type' => 'text',
+    'cardinality' => 1,
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_metascore',
+    'entity_type' => 'node',
+    'label' => 'Metascore',
+    'bundle' => 'movie',
+    'widget' => array(
+      'type' => 'text_textfield',
+      'weight' => 15,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'text_default',
+        'label' => 'inline',
+        'weight' => 7,
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field rating
+  $field = array(
+    'field_name' => 'field_rating',
+    'type' => 'number_decimal',
+    'cardinality' => 1,
+    'settings' => array(
+      'scale' => 1,
+    ),
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_rating',
+    'entity_type' => 'node',
+    'label' => 'Rating',
+    'bundle' => 'movie',
+    'default_value' => array(
+        array('value' => 0),
+    ),
+    'widget' => array(
+      'type' => 'numer',
+      'weight' => 16,
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'number_decimal',
+        'label' => 'inline',
+        'weight' => 3,
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  //Field released
+  $field = array(
+    'field_name' => 'field_released',
+    'type' => 'datetime',
+    'cardinality' => 1,
+    'settings' => array(
+      'granularity' => array(
+        'year',
+        'month',
+        'day',
+      ),
+    ),
+  );
+  field_create_field($field);
+
+  $instance = array(
+    'field_name' => 'field_released',
+    'entity_type' => 'node',
+    'label' => 'Released',
+    'bundle' => 'movie',
+    'settings' => array(
+      'default_value' => 'blank',
+    ),
+    'widget' => array(
+      'type' => 'date_popup',
+      'weight' => 17,
+      'settings' => array(
+        'input_format' => 'Y-m-d H:i:s',
+        'year_range' => '1900:2020',
+      ),
+    ),
+    'display' => array(
+      'default' => array(
+        'type' => 'date_plain',
+        'label' => 'inline',
+        'weight' => 8,
+      ),
+      'teaser' => array(
+        'label' => 'hidden',
+        'type' => 'hidden',
+        'weight' => 10,
+      ),
+    ),
+  );
+  field_create_instance($instance);
+
+  // Enable default permissions for system roles.
+  user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array('access content'));
+  user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array('access content'));
+
+  // Create a default role for site administrators, with all available permissions assigned.
+  $admin_role = new stdClass();
+  $admin_role->name = 'administrator';
+  $admin_role->weight = 2;
+  user_role_save($admin_role);
+  user_role_grant_permissions($admin_role->rid, array_keys(module_invoke_all('permission')));
+  // Set this as the administrator role.
+  variable_set('user_admin_role', $admin_role->rid);
+
+  // Assign user 1 the "administrator" role.
+  db_insert('users_roles')
+    ->fields(array('uid' => 1, 'rid' => $admin_role->rid))
+    ->execute();
+
+  // Editor role
+  $editor_role = new stdClass();
+  $editor_role->name = 'editor';
+  $editor_role->weight = 3;
+  user_role_save($editor_role);
+  $permissions = array(
+    'create movie content' => 'node',
+    'edit any movie content' => 'node',
+    'delete any movie content' => 'node',
+    'create actor_director_writter content' => 'node',
+    'edit any actor_director_writter content' => 'node',
+    'delete any actor_director_writter content' => 'node',
+    'access content overview' => 'node',
+    'access toolbar' => 'toolbar'
+  );
+  foreach ($permissions as $perm => $module) {
+    db_merge('role_permission')
+      ->key(array(
+        'rid' => $editor_role->rid,
+        'permission' => $perm,
+      ))
+      ->fields(array(
+        'module' => $module,
+      ))
+      ->execute();
+  }
+
+  variable_set('site_frontpage', 'movie-list');
+
+}
+
+/**
+ * Implements hook_install_tasks().
+ */
+function rmdb_install_tasks($install_state){
+  $tasks = array(
+    'rmdb_enable_block_views' => array(
+      'display_name' => st('Enable block view'),
+      'display' => FALSE,
+      'type' => 'normal'
+    ),
+  );
+
+  return $tasks;
+}
+
+/**
+ * Cleanup install task.
+ */
+function rmdb_enable_block_views() {
+  // Enable blocks created by views.
+  db_update('block')
+    ->fields(array(
+        'status' => 1,
+        'region' => 'content',
+      )
+    )
+    ->condition('module', 'views')
+    ->execute();
+
+  $views_block = db_select('block', 'b')
+    ->fields('b', array('delta'))
+    ->condition('b.module', 'views')
+    ->execute()->fetchAll();
+
+  foreach ($views_block as $delta) {
+    if ($delta->delta === 'main') continue;
+    $exists = db_select('block_node_type', 'bnt')
+      ->fields('bnt', array('delta'))
+      ->condition('delta', $delta->delta)
+      ->condition('module', 'views')
+      ->condition('type', 'actor_director_writter')
+      ->execute()->fetchField();
+    if (!$exists) {
+      db_insert('block_node_type')
+      ->fields(array(
+          'module' => 'views',
+          'delta' => $delta->delta,
+          'type' => 'actor_director_writter',
+      ))
+      ->execute();
+    }
+  }
+}

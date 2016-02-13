@@ -1,0 +1,82 @@
+<?php
+
+/**
+ * @file
+ * Module file contains hooks.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function imdb_migrate_menu() {
+  $items = array();
+  $items['admin/migrate/setsource'] = array(
+    'page callback' => 'drupal_get_form',
+    'title' => 'Migration Source',
+    'page arguments' => array('_imdb_migrate_set_source'),
+    'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+  );
+  return $items;
+}
+
+/**
+ * Settings form to set the migration source.
+ */
+function _imdb_migrate_set_source($form, &$form_state) {
+  $form['source_type'] = array(
+    '#type' => 'radios',
+    '#title' => t('Select type'),
+    '#options' => array(2 => t('URL'), 3 => t('File')),
+    '#default_value' => variable_get('source_type', 2),
+  );
+  $form['migrate_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Enter URL'),
+    '#description' => t('Enter the JSON file url.'),
+    '#default_value' => variable_get('migrate_url', ''),
+    '#states' => array(
+       'visible' => array(
+         ':input[name=source_type]' => array('value' => 2),
+      ),
+    ),
+  );
+  $form['migrate_file'] = array(
+    '#type' => 'managed_file',
+    '#title' => t('Upload JSON file'),
+    '#description' => t('Upload the file contains JSON data.'),
+    '#default_value' => variable_get('migrate_file', ''),
+    '#upload_location' => 'public://',
+    '#upload_validators' => array(
+      'file_validate_extensions' => array('json JSON'),
+    ),
+    '#states' => array(
+       'visible' => array(
+         ':input[name=source_type]' => array('value' => 3),
+      ),
+    ),
+  );
+  return system_settings_form($form);
+}
+
+/**
+ * Implements hook_migrate_api().
+ */
+function imdb_migrate_migrate_api() {
+  $api = array(
+    'api' => 2,
+    'groups' => array(
+      'imdb_to_rmdb' => array(
+        'title' => t('Import movie data from IMDB to RMDB'),
+        'default_format' => 'filtered_html',
+      ),
+    ),
+    'migrations' => array(
+      'MigrateMovie' => array(
+        'class_name' => 'IMDBMovieMigration',
+        'group_name' => 'imdb_to_rmdb',
+     ),
+    ),
+  );
+  return $api;
+}
